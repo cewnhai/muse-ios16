@@ -75,36 +75,65 @@ final class ReverseProxy {
         return await fetchUpstream(host: host, path: upPath, req: req)
     }
 
-    private func fetchUpstream(host: String, path: String, req: HTTPRequest) async -> HTTPResponse {
-        guard let url = URL(string: "https://\(host)\(path)") else {
-            return HTTPResponse(status: 400, headers: [:], body: Data())
-        }
+    private func buildUpstreamRequest(host: String, path: String, req: HTTPRequest) -> URLRequest? {
+        guard let url = URL(string: "https://\(host)\(path)") else { return nil }
         var urlReq = URLRequest(url: url)
         urlReq.httpMethod = req.method
         let skip: Set<String> = [
             "host", "cookie", "content-length", "connection", "keep-alive",
             "proxy-authenticate", "proxy-authorization", "te", "trailer",
             "transfer-encoding", "upgrade",
+            // Let URLSession manage compression itself; forwarding Safari's
+            // Accept-Encoding would leave us with compressed bytes but no
+            // content-encoding header to tell Safari.
+            "accept-encoding",
         ]
         for (k, v) in req.headers where !skip.contains(k) {
             urlReq.setValue(v, forHTTPHeaderField: k)
         }
         if !req.body.isEmpty { urlReq.httpBody = req.body }
+        return urlReq
+    }
 
-        do {
-            let (data, resp) = try await session.data(for: urlReq)
-            guard let httpResp = resp as? HTTPURLResponse else {
-                return HTTPResponse(status: 502, headers: [:], body: Data())
+    private func isTransient(_ error: Error) -> Bool {
+        let nsErr = error as NSError
+        guard nsErr.domain == NSURLErrorDomain else { return false }
+        // -1005 connection lost, -1001 timeout, -1003 DNS, -1004 connect failed,
+        // -1009 no internet, -1200 SSL error (retry may pick a fresh connection)
+        return [-1005, -1001, -1003, -1004, -1009, -1200].contains(nsErr.code)
+    }
+
+    private func fetchUpstream(host: String, path: String, req: HTTPRequest) async -> HTTPResponse {
+        var lastError: Error?
+        for attempt in 0..<3 {
+            guard let urlReq = buildUpstreamRequest(host: host, path: path, req: req) else {
+                return HTTPResponse(status: 400, headers: [:], body: Data())
             }
-            return processResponse(data: data, response: httpResp, localPath: req.path, host: host)
-        } catch {
-            log("上游错误 \(host)\(path): \(error.localizedDescription)")
-            return HTTPResponse(
-                status: 502,
-                headers: ["content-type": "text/plain; charset=utf-8"],
-                body: Data("proxy error: \(error.localizedDescription)".utf8)
-            )
+            do {
+                let (data, resp) = try await session.data(for: urlReq)
+                guard let httpResp = resp as? HTTPURLResponse else {
+                    return HTTPResponse(status: 502, headers: [:], body: Data())
+                }
+                if attempt > 0 {
+                    log("上游重试成功 \(host)\(shortPath(path))")
+                }
+                return processResponse(data: data, response: httpResp, localPath: req.path, host: host)
+            } catch {
+                lastError = error
+                if isTransient(error), attempt < 2 {
+                    try? await Task.sleep(nanoseconds: 400_000_000)
+                    continue
+                }
+                break
+            }
         }
+        let nsErr = lastError as NSError?
+        log("上游错误 \(req.method) \(host)\(shortPath(path)): [\(nsErr?.domain ?? "?"):\(nsErr?.code ?? 0)] \(lastError?.localizedDescription ?? "?")")
+        return HTTPResponse(
+            status: 502,
+            headers: ["content-type": "text/plain; charset=utf-8"],
+            body: Data("proxy error".utf8)
+        )
     }
 
     // MARK: - Response processing
