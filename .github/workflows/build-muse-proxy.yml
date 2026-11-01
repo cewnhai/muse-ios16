@@ -7,6 +7,9 @@ on:
       - ".github/workflows/build-muse-proxy.yml"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: macos-15
@@ -53,3 +56,12 @@ jobs:
           name: MuseProxy-ipa
           path: ${{ runner.temp }}/MuseProxy.ipa
           retention-days: 14
+
+      - name: Publish to Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="museproxy-build-${{ github.run_number }}"
+          gh release create "$TAG" "${{ runner.temp }}/MuseProxy.ipa" \
+            --title "MuseProxy $TAG" \
+            --notes "TrollStore 直装包"
