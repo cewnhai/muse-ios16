@@ -290,6 +290,15 @@ final class ReverseProxy {
     var resolve,reject;var promise=new Promise(function(res,rej){resolve=res;reject=rej;});
     return{promise:promise,resolve:resolve,reject:reject};}});patched.push('Promise.withResolvers');}
     try{document.documentElement.setAttribute('data-muse-proxy-polyfill',patched.join(','));}catch(e){}
+    // HTMLMediaElement.play() may return undefined on old WebKit; ensure Promise.
+    try{
+    if(typeof HTMLMediaElement!=='undefined'&&HTMLMediaElement.prototype.play){
+    var _origPlay=HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play=function(){
+    try{var r=_origPlay.apply(this,arguments);return (r instanceof Promise)?r:Promise.resolve(r);}
+    catch(e){return Promise.reject(e);}
+    };patched.push('HTMLMediaElement.play');}
+    }catch(e){}
     })();
     """#
 
