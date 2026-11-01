@@ -67,6 +67,11 @@ final class ReverseProxy {
     // MARK: - Request handling
 
     private func handle(_ req: HTTPRequest) async -> HTTPResponse {
+        if req.path == "/__log_error" {
+            let msg = String(data: req.body, encoding: .utf8) ?? "(empty)"
+            log("页面JS错误: \(msg)")
+            return HTTPResponse(status: 200, headers: [:], body: Data())
+        }
         if req.path == "/" || req.path.hasPrefix("/?") {
             // Top-level entry always serves the muse.ai homepage.
             return await fetchUpstream(host: "muse.ai", path: "/", req: req)
@@ -296,7 +301,7 @@ final class ReverseProxy {
         let nonce = String(afterNonce[..<endQuote])
         guard !nonce.isEmpty, nonce.count < 128 else { return html }
 
-        let tag = "<script nonce=\"\(nonce)\">\(polyfillJS)</script>"
+        let tag = "<script nonce=\"\(nonce)\">\(polyfillJS)</script><script nonce=\"\(nonce)\">\(errorCollectorJS)</script>"
         // Insert right after <head...> so it runs before app scripts.
         if let headStart = html.range(of: "<head"),
            let headEnd = html[headStart.upperBound...].firstIndex(of: ">")
@@ -308,6 +313,15 @@ final class ReverseProxy {
         }
         return html
     }
+
+    /// Captures JS runtime errors and sends them to the proxy log.
+    private let errorCollectorJS = #"""
+    (function(){
+    function send(msg){try{fetch('/__log_error',{method:'POST',headers:{'Content-Type':'text/plain'},body:String(msg).slice(0,2000),keepalive:true});}catch(e){}}
+    window.addEventListener('error',function(ev){send('ONERROR: '+(ev.message||'?')+' @ '+(ev.filename||'?')+':'+(ev.lineno||'?')+':'+(ev.colno||'?'));});
+    window.addEventListener('unhandledrejection',function(ev){var r=ev.reason;var m=(r&&(r.stack||r.message))||String(r);send('UNHANDLED: '+m);});
+    })();
+    """#
 
     // MARK: - Transpile disk cache
 
