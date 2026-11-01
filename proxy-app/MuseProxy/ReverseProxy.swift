@@ -343,6 +343,8 @@ final class ReverseProxy {
     catch(e){return Promise.reject(e);}
     };patched.push('HTMLMediaElement.play');}
     }catch(e){}
+    // Dummy OTPCredential so 'OTPCredential' in window is true (WebOTP not on iOS 16).
+    try{if(typeof window.OTPCredential==='undefined'){window.OTPCredential=function(){};patched.push('OTPCredential');}}catch(e){}
     })();
     """#
 
