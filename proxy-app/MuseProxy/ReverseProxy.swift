@@ -281,6 +281,12 @@ final class ReverseProxy {
         var u = url
         u = u.replacingOccurrences(of: "https://muse.ai", with: Self.localBase)
         u = u.replacingOccurrences(of: "https://auth.meta.com", with: Self.localBase + "/__r__/auth.meta.com")
+        // Bare hostname checks (anti-phishing): 'muse.ai' -> '127.0.0.1'
+        // (quoted only, to avoid breaking emails/URLs)
+        u = u.replacingOccurrences(of: "'muse.ai'", with: "'127.0.0.1'")
+        u = u.replacingOccurrences(of: "\"muse.ai\"", with: "\"127.0.0.1\"")
+        u = u.replacingOccurrences(of: "'www.muse.ai'", with: "'127.0.0.1'")
+        u = u.replacingOccurrences(of: "\"www.muse.ai\"", with: "\"127.0.0.1\"")
         return u
     }
 
