@@ -91,8 +91,42 @@ final class ReverseProxy {
         for (k, v) in req.headers where !skip.contains(k) {
             urlReq.setValue(v, forHTTPHeaderField: k)
         }
+        // The browser thinks it's on http://127.0.0.1:8080, but upstream
+        // must see the real origin, otherwise Meta's API rejects the request
+        // as CSRF ("we cannot send the verification code").
+        let upstreamOrigin = "https://\(host)"
+        if let origin = req.headers["origin"], origin.hasPrefix(Self.localBase) {
+            urlReq.setValue(upstreamOrigin, forHTTPHeaderField: "Origin")
+        }
+        if let referer = req.headers["referer"], referer.hasPrefix(Self.localBase) {
+            urlReq.setValue(rewriteToUpstream(referer), forHTTPHeaderField: "Referer")
+        }
         if !req.body.isEmpty { urlReq.httpBody = req.body }
         return urlReq
+    }
+
+    /// http://127.0.0.1:8080/__r__/<host>/... -> https://<host>/...
+    /// http://127.0.0.1:8080/... -> https://muse.ai/...
+    private func rewriteToUpstream(_ url: String) -> String {
+        let prefix = Self.localBase + "/__r__/"
+        if url.hasPrefix(prefix) {
+            let rest = String(url.dropFirst(prefix.count))
+            if let slash = rest.firstIndex(of: "/") {
+                let h = String(rest[..<slash])
+                let p = String(rest[slash...])
+                return "https://" + h + p
+            }
+            if let q = rest.firstIndex(of: "?") {
+                let h = String(rest[..<q])
+                let query = String(rest[q...])
+                return "https://" + h + "/" + query
+            }
+            return "https://" + rest + "/"
+        }
+        if url.hasPrefix(Self.localBase) {
+            return "https://muse.ai" + String(url.dropFirst(Self.localBase.count))
+        }
+        return url
     }
 
     private func isTransient(_ error: Error) -> Bool {
