@@ -19,8 +19,10 @@ final class ReverseProxy {
     init() {
         server = LocalHTTPServer(port: Self.localPort)
         let config = URLSessionConfiguration.default
-        config.httpShouldSetCookies = true
-        config.httpCookieAcceptPolicy = .always
+        // We manage cookies manually for transparency (see below); do not let
+        // URLSession maintain a separate jar that Safari's JS cannot see.
+        config.httpShouldSetCookies = false
+        config.httpCookieAcceptPolicy = .never
         config.timeoutIntervalForRequest = 60
         session = URLSession(configuration: config)
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
@@ -85,7 +87,7 @@ final class ReverseProxy {
         var urlReq = URLRequest(url: url)
         urlReq.httpMethod = req.method
         let skip: Set<String> = [
-            "host", "cookie", "content-length", "connection", "keep-alive",
+            "host", "content-length", "connection", "keep-alive",
             "proxy-authenticate", "proxy-authorization", "te", "trailer",
             "transfer-encoding", "upgrade",
             // Let URLSession manage compression itself; forwarding Safari's
@@ -191,15 +193,26 @@ final class ReverseProxy {
         return nil
     }
 
-    private func processResponse(data: Data, response: HTTPURLResponse, localPath: String, host: String) -> HTTPResponse {        var headers: [String: String] = [:]
+    private func processResponse(data: Data, response: HTTPURLResponse, localPath: String, host: String) -> HTTPResponse {
+        var headers: [String: String] = [:]
+        var setCookies: [String] = []
         for (k, v) in response.allHeaderFields {
             guard let ks = k as? String, let vs = v as? String else { continue }
             let kl = ks.lowercased()
-            // We re-encode the body ourselves; cookies stay in the app's jar.
-            if ["content-length", "transfer-encoding", "connection", "content-encoding", "set-cookie"].contains(kl) {
+            if kl == "set-cookie" {
+                setCookies.append(vs)
+                continue
+            }
+            // We re-encode the body ourselves.
+            if ["content-length", "transfer-encoding", "connection", "content-encoding"].contains(kl) {
                 continue
             }
             headers[ks] = vs
+        }
+        // Rewrite Set-Cookie for localhost so Safari's JS can read cookies
+        // (CSRF tokens etc.). Domain=<upstream> -> 127.0.0.1, strip Secure.
+        for sc in setCookies {
+            headers["Set-Cookie"] = rewriteSetCookie(sc)
         }
         if let locKey = headers.keys.first(where: { $0.lowercased() == "location" }),
            let loc = headers[locKey]
@@ -269,6 +282,21 @@ final class ReverseProxy {
     private func rewriteHTML(_ html: String) -> String { rewriteURL(html) }
     private func rewriteJS(_ js: String) -> String { rewriteURL(js) }
     private func rewriteCSS(_ css: String) -> String { rewriteURL(css) }
+
+    /// Rewrite a Set-Cookie header so Safari accepts it on http://127.0.0.1:8080:
+    /// drop Domain (host-only for 127.0.0.1) and strip the Secure flag.
+    private func rewriteSetCookie(_ sc: String) -> String {
+        var parts = sc.components(separatedBy: ";")
+        var out: [String] = []
+        for p in parts {
+            let t = p.trimmingCharacters(in: .whitespaces)
+            let tl = t.lowercased()
+            if tl.hasPrefix("domain=") { continue }
+            if tl == "secure" { continue }
+            out.append(t)
+        }
+        return out.joined(separator: "; ")
+    }
 
     // MARK: - Polyfill injection
 
