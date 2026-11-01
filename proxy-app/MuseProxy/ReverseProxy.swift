@@ -156,6 +156,11 @@ final class ReverseProxy {
                 if attempt > 0 {
                     log("上游重试成功 \(host)\(shortPath(path))")
                 }
+                // Log auth API response bodies for diagnosis (first 500 chars).
+                if path.contains("/api/auth/") || path.contains("/api/") {
+                    let bodyPreview = String(data: data.prefix(500), encoding: .utf8) ?? "(binary)"
+                    log("API响应 \(host)\(shortPath(path)) [\(httpResp.statusCode)]: \(bodyPreview)")
+                }
                 return processResponse(data: data, response: httpResp, localPath: req.path, host: host)
             } catch {
                 lastError = error
