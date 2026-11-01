@@ -38,10 +38,10 @@ final class MuseURLProtocol: URLProtocol {
         if URLProtocol.property(forKey: handledKey, in: request) != nil { return false }
         let host = url.host?.lowercased() ?? ""
         let path = url.path.lowercased()
-        // NEVER intercept API calls: let them go through WKWebView's native
-        // network stack so TLS/HTTP fingerprints stay Safari-original.
-        // (Intercepting APIs via URLSession gets flagged by Meta's bot detection.)
-        if path.hasPrefix("/api/") { return false }
+        // v8: /api/* NO LONGER bypasses the protocol.
+        // Reason: HTML via URLSession + API via WKWebView splits cookies
+        // into two jars; the API then lacks session cookies -> 403.
+        // Routing everything through URLSession keeps one consistent jar.
         // Only intercept page HTML and JS from muse.ai / meta / fbcdn.
         if host.hasSuffix("muse.ai") || host.hasSuffix("meta.com") || host.hasSuffix("fbcdn.net") {
             return true
