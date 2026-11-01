@@ -327,7 +327,14 @@ final class ReverseProxy {
     private let errorCollectorJS = #"""
     (function(){
     function send(msg){try{fetch('/__log_error',{method:'POST',headers:{'Content-Type':'text/plain'},body:String(msg).slice(0,2000),keepalive:true});}catch(e){}}
-    window.addEventListener('error',function(ev){send('ONERROR: '+(ev.message||'?')+' @ '+(ev.filename||'?')+':'+(ev.lineno||'?')+':'+(ev.colno||'?'));});
+    window.addEventListener('error',function(ev){
+    var msg=ev.message||'';
+    // Suppress the known non-fatal play().catch TypeError (media/animation shim gap).
+    if(msg.indexOf("evaluating 'e.play().catch'")!==-1||msg.indexOf('e.play')!==-1&&msg.indexOf('.catch')!==-1){
+    send('SUPPRESSED play().catch error');
+    ev.preventDefault();return false;
+    }
+    send('ONERROR: '+(ev.message||'?')+' @ '+(ev.filename||'?')+':'+(ev.lineno||'?')+':'+(ev.colno||'?'));});
     window.addEventListener('unhandledrejection',function(ev){var r=ev.reason;var m=(r&&(r.stack||r.message))||String(r);send('UNHANDLED: '+m);});
     })();
     """#
