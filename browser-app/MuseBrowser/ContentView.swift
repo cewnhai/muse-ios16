@@ -83,8 +83,8 @@ struct BrowserWebView: UIViewRepresentable {
                                     forMainFrameOnly: false)
         config.userContentController.addUserScript(polyfill)
         let view = WKWebView(frame: .zero, configuration: config)
-        // Spoof iOS 17 UA so server-side version checks pass.
-        view.customUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+        // Use the device's real User-Agent. A spoofed UA mismatches the
+        // TLS/device fingerprint and gets the auth API 403-blocked by Meta.
         view.navigationDelegate = context.coordinator
         view.allowsBackForwardNavigationGestures = true
         model.webView = view
