@@ -6,7 +6,7 @@ import Foundation
 final class MuseURLProtocol: URLProtocol {
 
     private static let handledKey = "MuseURLProtocolHandled"
-    private var task: URLSessionDataTask?
+    private var dataTask: URLSessionDataTask?
 
     // MARK: - Registration (private API to make it work with WKWebView)
 
@@ -57,7 +57,7 @@ final class MuseURLProtocol: URLProtocol {
         let config = URLSessionConfiguration.default
         config.httpShouldSetCookies = true
         let session = URLSession(configuration: config)
-        task = session.dataTask(with: mutable as URLRequest) { [weak self] data, response, error in
+        dataTask = session.dataTask(with: mutable as URLRequest) { [weak self] data, response, error in
             guard let self = self else { return }
             if let error = error {
                 self.client?.urlProtocol(self, didFailWithError: error)
@@ -104,12 +104,12 @@ final class MuseURLProtocol: URLProtocol {
             self.client?.urlProtocol(self, didLoad: outData)
             self.client?.urlProtocolDidFinishLoading(self)
         }
-        task?.resume()
+        dataTask?.resume()
     }
 
     override func stopLoading() {
-        task?.cancel()
-        task = nil
+        dataTask?.cancel()
+        dataTask = nil
     }
 }
 
