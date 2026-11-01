@@ -37,7 +37,12 @@ final class MuseURLProtocol: URLProtocol {
         // Avoid loops.
         if URLProtocol.property(forKey: handledKey, in: request) != nil { return false }
         let host = url.host?.lowercased() ?? ""
-        // Only intercept muse.ai and Meta auth hosts; let everything else pass.
+        let path = url.path.lowercased()
+        // NEVER intercept API calls: let them go through WKWebView's native
+        // network stack so TLS/HTTP fingerprints stay Safari-original.
+        // (Intercepting APIs via URLSession gets flagged by Meta's bot detection.)
+        if path.hasPrefix("/api/") { return false }
+        // Only intercept page HTML and JS from muse.ai / meta / fbcdn.
         if host.hasSuffix("muse.ai") || host.hasSuffix("meta.com") || host.hasSuffix("fbcdn.net") {
             return true
         }
