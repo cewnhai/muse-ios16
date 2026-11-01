@@ -181,8 +181,7 @@ final class ReverseProxy {
         return nil
     }
 
-    private func processResponse(data: Data, response: HTTPURLResponse, localPath: String, host: String) -> HTTPResponse {
-        var headers: [String: String] = [:]
+    private func processResponse(data: Data, response: HTTPURLResponse, localPath: String, host: String) -> HTTPResponse {        var headers: [String: String] = [:]
         for (k, v) in response.allHeaderFields {
             guard let ks = k as? String, let vs = v as? String else { continue }
             let kl = ks.lowercased()
@@ -209,7 +208,7 @@ final class ReverseProxy {
         var body = data
         if ct.contains("text/html") {
             if let html = String(data: data, encoding: .utf8) {
-                body = Data(rewriteHTML(html).utf8)
+                body = Data(injectPolyfill(rewriteHTML(html)).utf8)
             }
         } else if ct.contains("javascript") || ct.contains("ecmascript")
             || localPath.hasSuffix(".js") || localPath.contains(".js?")
@@ -260,6 +259,55 @@ final class ReverseProxy {
     private func rewriteHTML(_ html: String) -> String { rewriteURL(html) }
     private func rewriteJS(_ js: String) -> String { rewriteURL(js) }
     private func rewriteCSS(_ css: String) -> String { rewriteURL(css) }
+
+    // MARK: - Polyfill injection
+
+    /// API polyfills for iOS 16.3 (AbortSignal.any, Promise.withResolvers).
+    /// Injected as an inline <script> with the page's own CSP nonce so it
+    /// passes script-src. Runs before the app's scripts (placed in <head>).
+    private let polyfillJS = #"""
+    (function(){'use strict';var patched=[];
+    if(typeof AbortSignal!=='undefined'&&typeof AbortSignal.any!=='function'){
+    Object.defineProperty(AbortSignal,'any',{configurable:true,writable:true,value:function(signals){
+    var list=Array.from(signals);var controller=new AbortController();var i;
+    for(i=0;i<list.length;i++){if(list[i].aborted){controller.abort(list[i].reason);return controller.signal;}}
+    var onAbort=function(event){if(!controller.signal.aborted){controller.abort(event.target.reason);cleanup();}};
+    var cleanup=function(){for(var j=0;j<list.length;j++){list[j].removeEventListener('abort',onAbort);}};
+    for(i=0;i<list.length;i++){list[i].addEventListener('abort',onAbort,{once:true});}
+    return controller.signal;}});patched.push('AbortSignal.any');}
+    if(typeof AbortSignal!=='undefined'&&typeof AbortSignal.timeout!=='function'){
+    Object.defineProperty(AbortSignal,'timeout',{configurable:true,writable:true,value:function(ms){
+    var controller=new AbortController();
+    setTimeout(function(){controller.abort(new DOMException('The operation timed out','TimeoutError'));},Math.max(0,Number(ms)||0));
+    return controller.signal;}});patched.push('AbortSignal.timeout');}
+    if(typeof Promise.withResolvers!=='function'){
+    Object.defineProperty(Promise,'withResolvers',{configurable:true,writable:true,value:function(){
+    var resolve,reject;var promise=new Promise(function(res,rej){resolve=res;reject=rej;});
+    return{promise:promise,resolve:resolve,reject:reject};}});patched.push('Promise.withResolvers');}
+    try{document.documentElement.setAttribute('data-muse-proxy-polyfill',patched.join(','));}catch(e){}
+    })();
+    """#
+
+    private func injectPolyfill(_ html: String) -> String {
+        // Extract a CSP nonce from an existing script tag.
+        guard let nRange = html.range(of: "nonce=\"") else { return html }
+        let afterNonce = html[nRange.upperBound...]
+        guard let endQuote = afterNonce.firstIndex(of: "\"") else { return html }
+        let nonce = String(afterNonce[..<endQuote])
+        guard !nonce.isEmpty, nonce.count < 128 else { return html }
+
+        let tag = "<script nonce=\"\(nonce)\">\(polyfillJS)</script>"
+        // Insert right after <head...> so it runs before app scripts.
+        if let headStart = html.range(of: "<head"),
+           let headEnd = html[headStart.upperBound...].firstIndex(of: ">")
+        {
+            var out = html
+            out.insert(contentsOf: tag, at: html.index(after: headEnd))
+            log("已注入 API polyfill")
+            return out
+        }
+        return html
+    }
 
     // MARK: - Transpile disk cache
 
