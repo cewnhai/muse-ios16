@@ -3,8 +3,8 @@ import SwiftUI
 @main
 struct MuseBrowserApp: App {
     init() {
-        // Register our URLProtocol for https (via private API, TrollStore OK).
-        MuseURLProtocol.register()
+        // v7-minimal: URLProtocol disabled for testing. Pure WKWebView.
+        // MuseURLProtocol.register()
     }
 
     var body: some Scene {
