@@ -159,6 +159,20 @@ enum HTMLPatcher {
     var resolve,reject;var promise=new Promise(function(res,rej){resolve=res;reject=rej;});
     return{promise:promise,resolve:resolve,reject:reject};}});patched.push('Promise.withResolvers');}
     try{if(typeof window.OTPCredential==='undefined'){window.OTPCredential=function(){};patched.push('OTPCredential');}}catch(e){}
+    try{
+    if(typeof Array.prototype.toSorted!=='function'){
+    Array.prototype.toSorted=function(c){return Array.prototype.slice.call(this).sort(c);};patched.push('Array.toSorted');}
+    if(typeof Array.prototype.toReversed!=='function'){
+    Array.prototype.toReversed=function(){return Array.prototype.slice.call(this).reverse();};patched.push('Array.toReversed');}
+    if(typeof Array.prototype.toSpliced!=='function'){
+    Array.prototype.toSpliced=function(s,dc){var a=Array.prototype.slice.call(this);var args=Array.prototype.slice.call(arguments,2);a.splice.apply(a,[s,dc].concat(args));return a;};patched.push('Array.toSpliced');}
+    if(typeof Array.prototype.with!=='function'){
+    Array.prototype.with=function(i,v){var a=Array.prototype.slice.call(this);a[i]=v;return a;};patched.push('Array.with');}
+    if(typeof Array.prototype.findLast!=='function'){
+    Array.prototype.findLast=function(fn){for(var i=this.length-1;i>=0;i--){if(fn(this[i],i,this))return this[i];}return undefined;};patched.push('Array.findLast');}
+    if(typeof Array.prototype.findLastIndex!=='function'){
+    Array.prototype.findLastIndex=function(fn){for(var i=this.length-1;i>=0;i--){if(fn(this[i],i,this))return i;}return -1;};patched.push('Array.findLastIndex');}
+    }catch(e){}
     try{document.documentElement.setAttribute('data-muse-browser-polyfill',patched.join(','));}catch(e){}
     })();
     """
@@ -169,7 +183,7 @@ enum HTMLPatcher {
         guard let endQuote = afterNonce.firstIndex(of: "\"") else { return html }
         let nonce = String(afterNonce[..<endQuote])
         guard !nonce.isEmpty, nonce.count < 128 else { return html }
-        let tag = "<script nonce=\"\(nonce)\">\(polyfillJS)</script>"
+        let tag = "<script nonce=\"\(nonce)\">\(polyfillJS)</script><script nonce=\"\(nonce)\">\(diagJS)</script>"
         if let headRange = html.range(of: "<head>") {
             var out = html
             out.insert(contentsOf: tag, at: headRange.upperBound)
@@ -177,4 +191,22 @@ enum HTMLPatcher {
         }
         return html
     }
+
+    /// Diagnostic: log API availability and catch JS errors.
+    static let diagJS = """
+    (function(){
+    function send(m){try{console.log('[MuseBrowser-DIAG] '+m);}catch(e){}}
+    try{
+    var info=[];
+    info.push('crypto.subtle='+!!(window.crypto&&window.crypto.subtle));
+    info.push('PublicKeyCredential='+('PublicKeyCredential' in window));
+    info.push('AbortSignal.any='+(typeof AbortSignal.any));
+    info.push('Promise.withResolvers='+(typeof Promise.withResolvers));
+    info.push('OTPCredential='+('OTPCredential' in window));
+    send('AUTH-DIAG: '+info.join(' | '));
+    }catch(e){send('DIAG failed: '+e.message);}
+    window.addEventListener('error',function(ev){send('ONERROR: '+(ev.message||'?')+' @ '+(ev.filename||'?')+':'+(ev.lineno||'?'));});
+    window.addEventListener('unhandledrejection',function(ev){var r=ev.reason;send('UNHANDLED: '+((r&&(r.stack||r.message))||String(r)));});
+    })();
+    """
 }
