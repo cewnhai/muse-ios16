@@ -77,11 +77,11 @@ struct BrowserWebView: UIViewRepresentable {
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()
-        // Inject polyfills via WKUserScript (bypasses CSP, runs at document start).
-        let polyfill = WKUserScript(source: PolyfillJS.source,
-                                    injectionTime: .atDocumentStart,
-                                    forMainFrameOnly: false)
-        config.userContentController.addUserScript(polyfill)
+        // v7-minimal: polyfill disabled for testing. Pure WKWebView.
+        // let polyfill = WKUserScript(source: PolyfillJS.source,
+        //                             injectionTime: .atDocumentStart,
+        //                             forMainFrameOnly: false)
+        // config.userContentController.addUserScript(polyfill)
         let view = WKWebView(frame: .zero, configuration: config)
         // Use the device's real User-Agent. A spoofed UA mismatches the
         // TLS/device fingerprint and gets the auth API 403-blocked by Meta.
