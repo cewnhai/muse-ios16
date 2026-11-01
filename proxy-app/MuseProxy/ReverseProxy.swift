@@ -74,15 +74,6 @@ final class ReverseProxy {
             log("页面JS错误: \(msg)")
             return HTTPResponse(status: 200, headers: [:], body: Data())
         }
-        // DIAGNOSTIC: fake success for native/restart to see if frontend proceeds.
-        if req.path.contains("/api/auth/native/restart") {
-            log("拦截 native/restart，返回伪造成功")
-            return HTTPResponse(
-                status: 200,
-                headers: ["content-type": "application/json"],
-                body: Data("{\"success\":true}".utf8)
-            )
-        }
         if req.path == "/" || req.path.hasPrefix("/?") {
             // Top-level entry always serves the muse.ai homepage.
             return await fetchUpstream(host: "muse.ai", path: "/", req: req)
@@ -369,6 +360,20 @@ final class ReverseProxy {
     private let errorCollectorJS = #"""
     (function(){
     function send(msg){try{fetch('/__log_error',{method:'POST',headers:{'Content-Type':'text/plain'},body:String(msg).slice(0,2000),keepalive:true});}catch(e){}}
+    // Diagnostic: log auth-relevant API availability.
+    try{
+    var info=[];
+    info.push('isSecureContext='+window.isSecureContext);
+    info.push('protocol='+location.protocol);
+    info.push('hostname='+location.hostname);
+    info.push('crypto.subtle='+!!(window.crypto&&window.crypto.subtle));
+    info.push('PublicKeyCredential='+('PublicKeyCredential' in window));
+    info.push('navigator.credentials='+!!(navigator.credentials));
+    info.push('OTPCredential='+('OTPCredential' in window));
+    info.push('AbortSignal.any='+(typeof AbortSignal.any));
+    info.push('Promise.withResolvers='+(typeof Promise.withResolvers));
+    send('AUTH-DIAG: '+info.join(' | '));
+    }catch(e){send('AUTH-DIAG failed: '+e.message);}
     window.addEventListener('error',function(ev){
     var msg=ev.message||'';
     // Suppress the known non-fatal play().catch TypeError (media/animation shim gap).
