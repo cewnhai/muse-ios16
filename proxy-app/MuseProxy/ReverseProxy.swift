@@ -74,6 +74,15 @@ final class ReverseProxy {
             log("页面JS错误: \(msg)")
             return HTTPResponse(status: 200, headers: [:], body: Data())
         }
+        // DIAGNOSTIC: fake success for native/restart to see if frontend proceeds.
+        if req.path.contains("/api/auth/native/restart") {
+            log("拦截 native/restart，返回伪造成功")
+            return HTTPResponse(
+                status: 200,
+                headers: ["content-type": "application/json"],
+                body: Data("{\"success\":true}".utf8)
+            )
+        }
         if req.path == "/" || req.path.hasPrefix("/?") {
             // Top-level entry always serves the muse.ai homepage.
             return await fetchUpstream(host: "muse.ai", path: "/", req: req)
