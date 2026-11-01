@@ -81,18 +81,14 @@ final class MuseURLProtocol: URLProtocol {
             var outHeaders = httpResp.allHeaderFields as? [String: String] ?? [:]
 
             if contentType.contains("text/html") || path.hasSuffix(".html") || path == "/" || path.isEmpty {
-                if let html = String(data: data, encoding: .utf8) {
-                    let patched = HTMLPatcher.injectPolyfill(html)
-                    outData = patched.data(using: .utf8) ?? data
-                    outHeaders.removeValue(forKey: "Content-Length")
-                    // Strip upgrade-insecure-requests so http subresources (if any) survive.
-                    if var csp = outHeaders["Content-Security-Policy"] {
-                        csp = csp.replacingOccurrences(of: "upgrade-insecure-requests; ", with: "")
-                        csp = csp.replacingOccurrences(of: "upgrade-insecure-requests", with: "")
-                        outHeaders["Content-Security-Policy"] = csp
-                    }
-                    NSLog("[MuseBrowser] HTML patched: \(url.absoluteString.prefix(80))")
+                // HTML: no longer inject polyfill here (now via WKUserScript).
+                // Just strip upgrade-insecure-requests from CSP.
+                if var csp = outHeaders["Content-Security-Policy"] {
+                    csp = csp.replacingOccurrences(of: "upgrade-insecure-requests; ", with: "")
+                    csp = csp.replacingOccurrences(of: "upgrade-insecure-requests", with: "")
+                    outHeaders["Content-Security-Policy"] = csp
                 }
+                NSLog("[MuseBrowser] HTML passthrough: \(url.absoluteString.prefix(80))")
             } else if contentType.contains("javascript") || path.hasSuffix(".js") {
                 if JSTranspile.shouldTranspile(data) {
                     if let out = JSTranspile.transpile(data) {
