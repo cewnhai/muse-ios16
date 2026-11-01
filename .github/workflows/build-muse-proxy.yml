@@ -1,0 +1,55 @@
+name: Build MuseProxy IPA
+
+on:
+  push:
+    paths:
+      - "proxy-app/**"
+      - ".github/workflows/build-muse-proxy.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Download Babel standalone
+        run: |
+          cd proxy-app/MuseProxy
+          (curl -fsSL --max-time 120 https://unpkg.com/@babel/standalone@7.26.4/babel.min.js -o babel.min.js \
+            || curl -fsSL --max-time 120 https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js -o babel.min.js)
+          ls -la babel.min.js
+          head -c 100 babel.min.js
+
+      - name: Archive (unsigned, for TrollStore)
+        run: |
+          xcodebuild \
+            -project proxy-app/MuseProxy.xcodeproj \
+            -scheme MuseProxy \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/MuseProxy.xcarchive" \
+            archive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
+
+      - name: Package IPA
+        run: |
+          APP_PATH="$RUNNER_TEMP/MuseProxy.xcarchive/Products/Applications/MuseProxy.app"
+          ls -la "$APP_PATH"
+          mkdir -p "$RUNNER_TEMP/Payload"
+          cp -R "$APP_PATH" "$RUNNER_TEMP/Payload/"
+          cd "$RUNNER_TEMP"
+          zip -qr MuseProxy.ipa Payload
+          ls -la MuseProxy.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MuseProxy-ipa
+          path: ${{ runner.temp }}/MuseProxy.ipa
+          retention-days: 14
