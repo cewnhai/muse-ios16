@@ -96,7 +96,12 @@ final class ReverseProxy {
             "accept-encoding",
         ]
         for (k, v) in req.headers where !skip.contains(k) {
-            urlReq.setValue(v, forHTTPHeaderField: k)
+            // Spoof iOS 17 UA upstream as well (in case server gates on it).
+            if k == "user-agent" {
+                urlReq.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: k)
+            } else {
+                urlReq.setValue(v, forHTTPHeaderField: k)
+            }
         }
         // The browser thinks it's on http://127.0.0.1:8080, but upstream
         // must see the real origin, otherwise Meta's API rejects the request
@@ -372,7 +377,15 @@ final class ReverseProxy {
     info.push('OTPCredential='+('OTPCredential' in window));
     info.push('AbortSignal.any='+(typeof AbortSignal.any));
     info.push('Promise.withResolvers='+(typeof Promise.withResolvers));
+    info.push('userAgent='+navigator.userAgent);
     send('AUTH-DIAG: '+info.join(' | '));
+    // Spoof iOS 17 UA in case frontend gates auth on OS version.
+    try{
+    var fakeUA='Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
+    Object.defineProperty(navigator,'userAgent',{get:function(){return fakeUA;},configurable:true});
+    Object.defineProperty(navigator,'platform',{get:function(){return 'iPhone';},configurable:true});
+    send('UA-SPOOFED to iOS 17');
+    }catch(e){send('UA-SPOOF failed: '+e.message);}
     }catch(e){send('AUTH-DIAG failed: '+e.message);}
     window.addEventListener('error',function(ev){
     var msg=ev.message||'';
