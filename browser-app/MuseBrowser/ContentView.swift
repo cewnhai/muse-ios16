@@ -77,6 +77,11 @@ struct BrowserWebView: UIViewRepresentable {
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()
+        // Inject polyfills via WKUserScript (bypasses CSP, runs at document start).
+        let polyfill = WKUserScript(source: PolyfillJS.source,
+                                    injectionTime: .atDocumentStart,
+                                    forMainFrameOnly: false)
+        config.userContentController.addUserScript(polyfill)
         let view = WKWebView(frame: .zero, configuration: config)
         // Spoof iOS 17 UA so server-side version checks pass.
         view.customUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
