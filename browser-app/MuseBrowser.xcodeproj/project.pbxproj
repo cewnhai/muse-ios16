@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		A1B2C3D4E5F6000102030421 /* MuseBrowserApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000102030411 /* MuseBrowserApp.swift */; };
 		A1B2C3D4E5F6000102030422 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000102030412 /* ContentView.swift */; };
+		A1B2C3D4E5F6000102030427 /* Polyfill.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000102030417 /* Polyfill.swift */; };
 		A1B2C3D4E5F6000102030423 /* MuseURLProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000102030413 /* MuseURLProtocol.swift */; };
 		A1B2C3D4E5F6000102030425 /* Transpiler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000102030415 /* Transpiler.swift */; };
 		A1B2C3D4E5F6000102030426 /* babel.min.js in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000102030416 /* babel.min.js */; };
@@ -17,6 +18,7 @@
 /* Begin PBXFileReference section */
 		A1B2C3D4E5F6000102030411 /* MuseBrowserApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MuseBrowserApp.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000102030412 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000102030417 /* Polyfill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Polyfill.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000102030413 /* MuseURLProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MuseURLProtocol.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000102030415 /* Transpiler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Transpiler.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000102030416 /* babel.min.js */ = {isa = PBXFileReference; lastKnownFileType = text.js; path = "babel.min.js"; sourceTree = "<group>"; };
@@ -48,6 +50,7 @@
 			children = (
 				A1B2C3D4E5F6000102030411 /* MuseBrowserApp.swift */,
 				A1B2C3D4E5F6000102030412 /* ContentView.swift */,
+				A1B2C3D4E5F6000102030417 /* Polyfill.swift */,
 				A1B2C3D4E5F6000102030413 /* MuseURLProtocol.swift */,
 				A1B2C3D4E5F6000102030415 /* Transpiler.swift */,
 				A1B2C3D4E5F6000102030416 /* babel.min.js */,
@@ -134,6 +137,7 @@
 			files = (
 				A1B2C3D4E5F6000102030421 /* MuseBrowserApp.swift in Sources */,
 				A1B2C3D4E5F6000102030422 /* ContentView.swift in Sources */,
+				A1B2C3D4E5F6000102030427 /* Polyfill.swift in Sources */,
 				A1B2C3D4E5F6000102030423 /* MuseURLProtocol.swift in Sources */,
 				A1B2C3D4E5F6000102030425 /* Transpiler.swift in Sources */,
 			);
